@@ -1,12 +1,13 @@
-class RealData_1min:
-    def __init__(self, code: str, name: str, market: str):
+
+class RealData_1min():
+    def __init__(self, code: str):#, name: str, market: str):
         # 종목코드, 종목명, 시장타입 설정
         self.code   = code
-        self.name   = name
-        if market == '': # ETN은 공백이 넘어옴
-            self.market = 'ETN'
-        else:
-            self.market = market
+        # self.name   = name
+        # if market == '': # ETN은 공백이 넘어옴
+        #     self.market = 'ETN'
+        # else:
+        #     self.market = market
         
         self.tick_count = 0
         
@@ -23,15 +24,22 @@ class RealData_1min:
         '''
         실시간 데이터를 추가하는 함수
         '''
-        self.체결시간.append(체결시간)
-        self.현재가.append(현재가)
-        self.거래량.append(거래량)
-        self.시가.append(시가)
-        self.고가.append(고가)
-        self.저가.append(저가)
-        self.체결날짜.append(체결날짜)
+        self.체결시간+=[체결시간]
+        self.현재가+=[현재가]
+        self.거래량+=[거래량]
+        self.시가+=[시가]
+        self.고가+=[고가]
+        self.저가+=[저가]
+        self.체결날짜+=[체결날짜]
+        # self.체결시간.append(체결시간)
+        # self.현재가.append(현재가)
+        # self.거래량.append(거래량)
+        # self.시가.append(시가)
+        # self.고가.append(고가)
+        # self.저가.append(저가)
+        # self.체결날짜.append(체결날짜)
 
-        RowCount = len(self.체결시간)
+        # RowCount = len(self.체결시간)
         # if RowCount >= RealData.DATA_FULL_SIZE:
         #     self.save_data(True)
 

@@ -62,17 +62,5 @@ class dbcon():
         except Exception as e:
             print( "Delete DB err", e)
 
-    # def insertUpdate(self, schema, table, column, data, key):
-    #     for d in data:
-    #         excd = "'excluded.".join(d) + ""
-    #     sql = 'INSERT INTO {schema}.{table} ({column}) VALUES ({data}) \
-    #         ON CONFLICT({key}) \
-    #             DO UPDATE SET ({column}) = ({excd})'.format
-
-
-
-    # def Connection(self):
-    #     return psycopg2.connect(host=self.host, dbname=self.dbname,user=self.user,
-    #     password=self.password, port=self.port, options=self.options)
 
 

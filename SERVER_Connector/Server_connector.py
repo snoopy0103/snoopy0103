@@ -2,14 +2,12 @@ from datetime import datetime, timedelta
 import os
 import debugpy
 from pandas.tseries.offsets import Day
-
 debugpy.debug_this_thread()
 import sys
 sys.path.append(os.path.dirname(os.path.abspath((os.path.dirname(__file__)))))
 from numpy import add, e, empty
 import numpy
 import pandas
-import zmq
 from time import sleep
 from pandas import DataFrame, Timestamp
 from threading import Thread
@@ -23,14 +21,16 @@ import socket
 import struct
 from SERVER_Connector.RealData import RealData
 from SERVER_Connector.RealData_1min import RealData_1min
-from Trading_Bot.Alexander_Elder import Three_dimesion
+from Trading_Bot.Alexander_Elder import Three_dimension
 import DBconnector.DBManager
+from DBconnector.Updater import Update_Data
 
 
 CONNECTIONS = [] #접속한 client의 쓰레드
 
 class Server_Connector():
-    def __init__(self, BuyQ, SellQ, StockQ, EwmQ, tick_1mindata):
+    def __init__(self, BuyQ, SellQ, StockQ, EwmQ, queue_Tick, queue_1min, \
+        queue_ATR, queue_ewm_5, queue_ewm_10, queue_ewm_30):
         self.HEADER_LENGTH = 1024
         self.ADDR_FEEDER = (Real_Ports.IP, Real_Ports.PORT_FEEDER)
         self.ADDR_TRADDER1 = (Real_Ports.IP, Real_Ports.PORT1)
@@ -72,16 +72,20 @@ class Server_Connector():
         # self.관심종목 = 관심종목
 
         #틱데이터 저장
-        # self.queue_Tick = queue.Queue()
-        # self.queue_1min = queue.Queue()
-        self.queue_Tick = Queue()
-        self.queue_1min = Queue()
-        self.queue_TR = Queue()
-        self.queue_Current_Line = Queue()
-        self.queue_ATR = Queue()
-        self.queue_ewm_5 = Queue()
-        self.queue_ewm_10 = Queue()
-        self.queue_ewm_30 = Queue()
+        # self.queue_Tick = Queue()
+        # self.queue_1min = Queue()
+        # self.queue_TR = Queue()
+        # self.queue_Current_Line = Queue()
+        # self.queue_ATR = Queue()
+        # self.queue_ewm_5 = Queue()
+        # self.queue_ewm_10 = Queue()
+        # self.queue_ewm_30 = Queue()
+        self.queue_Tick = queue_Tick
+        self.queue_1min = queue_1min
+        self.queue_ATR = queue_ATR
+        self.queue_ewm_5 = queue_ewm_5
+        self.queue_ewm_10 = queue_ewm_10
+        self.queue_ewm_30 = queue_ewm_30
         ###################################
         self.buyQ = BuyQ
         self.sellQ = SellQ
@@ -92,11 +96,9 @@ class Server_Connector():
         ###################################
         # self.min1Q = min1Q
         self.tick_data = {}
-        self.tick_1mindata_alex = tick_1mindata
+        # self.tick_1mindata_alex = {}
         self.tick_1mindata = {}
-        self.TR = {}
         self.ATR = {}
-        self.CerterLine = {}
         self.ewm_5 = {}
         self.ewm_10 = {}
         self.ewm_30 = {}
@@ -116,31 +118,17 @@ class Server_Connector():
         sql = f"SELECT distinct(code) as code FROM kiwoom.tick_1min WHERE 체결날짜 = '{self.previous_day}'"
         df = pandas.read_sql_query(sql, self.con.db)
         for code in df['code']:
-            self.TR[code] = []
-            self.CerterLine[code] = []
             self.ewm_5[code] = []
             self.ewm_10[code] = []
             self.ewm_30[code] = []
             self.ATR[code] = []
             self.tick_1mindata[code] = RealData_1min(code)
 
-            sql_tr = f"with temp_tr as (SELECT * FROM kiwoom.indicator_tr WHERE code = '{code}' AND 체결날짜 = '{self.previous_day}' AND \
-                체결시간 BETWEEN '1400' AND '1530' order by 체결시간 desc limit 21) select  * from temp_tr order by 체결시간 asc"
-            df_tr = pandas.read_sql_query(sql_tr, self.con.db)
-            for i in df_tr.index:
-                self.TR[code].append([df_tr['code'][i], str(df_tr['체결시간'][i].strftime("%H%M%S")), df_tr['tr'][i], str(df_tr['체결날짜'][i].strftime("%Y%m%d"))])
-
-            sql_cl = f"with temp_cl as (SELECT * FROM kiwoom.indicator_cl WHERE code = '{code}' AND 체결날짜 = '{self.previous_day}' AND \
-                체결시간 BETWEEN '1400' AND '1530' order by 체결시간 desc limit 21) select  * from temp_cl order by 체결시간 asc"
-            df_cl = pandas.read_sql_query(sql_cl, self.con.db)
-            for i in df_cl.index:
-                self.CerterLine[code].append([df_cl['code'][i], str(df_cl['체결시간'][i].strftime("%H%M%S")), df_cl['current_line'][i], str(df_cl['체결날짜'][i].strftime("%Y%m%d"))])
-
             sql_atr = f"with temp_atr as (SELECT * FROM kiwoom.indicator_atr WHERE code = '{code}' AND 체결날짜 = '{self.previous_day}' AND \
                 체결시간 BETWEEN '1400' AND '1530' order by 체결시간 desc limit 21) select  * from temp_atr order by 체결시간 asc"
             df_atr = pandas.read_sql_query(sql_atr, self.con.db)
             for i in df_atr.index:
-                self.ATR[code].append([df_atr['code'][i], str(df_atr['체결시간'][i].strftime("%H%M%S")), df_atr['atr'][i], str(df_atr['체결날짜'][i].strftime("%Y%m%d"))])
+                self.ATR[code].append([df_atr['code'][i], str(df_atr['체결시간'][i].strftime("%H%M%S")), df_atr['tr'][i], df_atr['atr'][i], df_atr['center_line'][i], str(df_atr['체결날짜'][i].strftime("%Y%m%d"))])
 
             sql_ewm_5 = f"with temp_ewm_5 as (SELECT * FROM kiwoom.indicator_5ewm WHERE code = '{code}' AND 체결날짜 = '{self.previous_day}' AND \
                 체결시간 BETWEEN '1400' AND '1530' order by 체결시간 desc limit 21) select  * from temp_ewm_5 order by 체결시간 asc"
@@ -170,14 +158,7 @@ class Server_Connector():
                 self.tick_1mindata[code].append(str(df_tick_1min['체결시간'][i].strftime("%H%M%S")), df_tick_1min['현재가'][i], df_tick_1min['거래량'][i], \
                     df_tick_1min['시가'][i], df_tick_1min['고가'][i], df_tick_1min['저가'][i], str(df_tick_1min['체결날짜'][i].strftime("%Y%m%d")))
         print('DB 로드 완료')
-        self.tick_1mindata_alex.update(self.tick_1mindata)
-        #Trading Bot 프로세스 생성
-        # self.trading_bot_proc = Process(target=Three_dimesion, args=(self.tick_1mindata_alex, BuyQ, SellQ, StockQ, EwmQ), daemon=True)
-
-
-        # self.trading_bot_proc.start()
-        # self.trading_bot_proc.join()
-
+        # self.tick_1mindata_alex.update(self.tick_1mindata)
         self.start()
         #######################################################################################################################
 
@@ -237,7 +218,7 @@ class Server_Connector():
                 self.t5 = Thread(target=self.listen, args=(notified_socket,self.bListen_socket4))
                 self.t5.start()            
                 print('Client4 Server Listening...')
-        self.tick_generator()
+        # self.tick_generator()
         return True    
 
     def stop(self):
@@ -311,14 +292,11 @@ class Server_Connector():
                     type_msg = msg['type_msg']
                     if type_msg == '종목등록':
                         code = msg['code']
-                        name = msg['name']
-                        market = msg['market']
-                        self.tick_data[code] = RealData(code, name, market)
+                        # name = msg['name']
+                        # market = msg['market']
+                        self.tick_data[code] = RealData(code)
                         # self.tick_1mindata[code] = RealData_1min(code)#, name, market)
-                        self.TR[code] = []
                         self.ATR[code] = []
-                        self.CerterLine[code] = []
-                        
                     elif type_msg == '틱':
                         code = msg['code']
                         총시간 = msg['tick_data'][0]
@@ -349,6 +327,8 @@ class Server_Connector():
                         상한가발생시간 = msg['tick_data'][25]
                         하한가발생시간 = msg['tick_data'][26]
                         체결날짜 = msg['tick_data'][27]
+                        if not code in self.tick_data.keys():
+                            self.tick_data[code] = RealData(code)
                         temp_list = [code, 총시간, 체결시간, 현재가, 체결방향, 전일대비, 등락율,
                                          최우선매도호가, 최우선매수호가, 거래량, 거래방향, 누적거래량, 누적거래대금,
                                          시가, 고가, 저가, 전일대비기호, 전일거래량대비, 거래대금증감, 전일거래량대비율, 
@@ -372,12 +352,7 @@ class Server_Connector():
                             self.관심종목[addr[1]] = []
                             self.관심종목[addr[1]].append(msg['code'])
         self.removeClient(addr, client)
-  
 
-    def tick_generator(self):
-        t = Thread(target= self.save_data)
-        t.start()
-    
     def tick_1min(self, temp_list):
         code = temp_list[0]
         mintime = temp_list[2]
@@ -388,77 +363,65 @@ class Server_Connector():
                 self.tick_1mindata[code].append(mintime, temp_list[3], temp_list[9], temp_list[3], temp_list[3], temp_list[3], temp_list[28])
                 return
             temptime = self.tick_1mindata[code].체결시간[-1]
-            # temptime = temptime[2:4]
             if temptime == mintime:
                 self.tick_1mindata[code].현재가[-1] = temp_list[3]
                 self.tick_1mindata[code].거래량[-1] = temp_list[9] + self.tick_1mindata[code].거래량[-1]
-                # self.tick_1mindata[code]['시가'][-1] = temp_list[13]
                 if temp_list[3] > self.tick_1mindata[code].고가[-1]:
                     self.tick_1mindata[code].고가[-1] = temp_list[3]
                 if temp_list[3] < self.tick_1mindata[code].저가[-1]:
                     self.tick_1mindata[code].저가[-1] = temp_list[3]
             else:
-                # if not code in self.tick_1mindata.keys():
-                #     self.tick_1mindata[code] = RealData_1min(code)
-                list_temp = self.tick_1mindata[code].last()
-                list_temp.insert(0, code)
+                # list_temp = self.tick_1mindata[code].last()
+                # list_temp.insert(0, code)
+                list_temp = [code, mintime, temp_list[3], temp_list[9], temp_list[3], temp_list[3], temp_list[3], mindate]
                 self.queue_1min.put(list_temp)
-                self.tick_1mindata_alex.update(self.tick_1mindata)
+                # self.tick_1mindata_alex.update(self.tick_1mindata)
                 self.tick_1mindata[code].append(mintime, temp_list[3], temp_list[9], temp_list[3], temp_list[3], temp_list[3], mindate)
         else:
             self.tick_1mindata[code] = RealData_1min(code)
-            self.tick_1mindata_alex.update(self.tick_1mindata)
+            # self.tick_1mindata_alex.update(self.tick_1mindata)
             self.tick_1mindata[code].append(mintime, temp_list[3], temp_list[9], temp_list[3], temp_list[3], temp_list[3], mindate)
 
     def make_Indicators(self, code, mintime, mindate):
         alex = []
+        temp_TR = 0
+        tempATR = 0
+        tempAVG = 0
         if not code in self.tick_1mindata.keys():
             return
-        #TR
         if len(self.tick_1mindata[code].체결시간) > 1:
             temptime = self.tick_1mindata[code].체결시간[-1]
+            #TR
             temp_TR = max(self.tick_1mindata[code].고가[-1] - self.tick_1mindata[code].저가[-1], 
             abs(self.tick_1mindata[code].고가[-1] - self.tick_1mindata[code].현재가[-2]), 
             abs(self.tick_1mindata[code].저가[-1] - self.tick_1mindata[code].현재가[-2]))
-            if temptime == mintime:
-                if self.TR[code] == []:
-                    self.TR[code].append([code, mintime, temp_TR, mindate])
-                self.TR[code][-1][2] = temp_TR
-            else:
-                self.queue_TR.put([code, mintime, temp_TR, mindate])
-                self.TR[code].append([code, mintime, temp_TR, mindate])
-
-        #Center Line
-        if len(self.tick_1mindata[code].체결시간) > 20:
-            tempAVG = 0
-            for i in range(len(self.tick_1mindata[code].체결시간), len(self.tick_1mindata[code].체결시간)-20, -1):
-                tempAVG += self.tick_1mindata[code].현재가[i-1] / 20
-            if temptime == mintime:
-                if self.CerterLine[code] == []:
-                    self.CerterLine[code].append([code, mintime, tempAVG, mindate])
-                self.CerterLine[code][-1][2] = tempAVG
-            else:
-                self.queue_Current_Line.put([code, mintime, tempAVG, mindate])
-                self.CerterLine[code].append([code, mintime, tempAVG, mindate])
-        
-        #ATR
-        if len(self.TR[code]) > 20:
-            tempATR = 0
-            for i in range(len(self.TR[code]), len(self.TR[code]) - 20, -1):
-                tempATR += self.TR[code][i-1][2] / 20
+            #Center Line
+            if len(self.tick_1mindata[code].체결시간) > 20:
+                for i in range(len(self.tick_1mindata[code].체결시간), len(self.tick_1mindata[code].체결시간)-20, -1):
+                    tempAVG += self.tick_1mindata[code].현재가[i-1] / 20
+            #ATR
+            if len(self.ATR[code]) > 20:
+                
+                for i in range(len(self.ATR[code]), len(self.ATR[code]) - 20, -1):
+                    tempATR += self.ATR[code][i-1][2] / 20
             if temptime == mintime:
                 if self.ATR[code] == []:
-                    self.ATR[code].append([code, mintime, tempATR, mindate])
-                self.ATR[code][-1][2] = tempATR
+                    self.ATR[code].append([code, mintime, temp_TR, tempATR, tempAVG,mindate])
+                self.ATR[code][-1][2] = temp_TR
+                self.ATR[code][-1][3] = tempATR
+                self.ATR[code][-1][4] = tempAVG
             else:
-                self.queue_ATR.put([code, mintime, tempATR, mindate])
-                self.CerterLine[code].append([code, mintime, tempATR, mindate])
-
+                self.ATR[code].append([code, mintime, temp_TR, tempATR, tempAVG, mindate])
+                self.queue_ATR.put([code, mintime, temp_TR, tempATR, tempAVG, mindate])
+                
+##############################################################################################################
         #5EWM
         if len(self.tick_1mindata[code].체결시간) > 5:
             temp5AVG = 0
             for i in range(len(self.tick_1mindata[code].체결시간), len(self.tick_1mindata[code].체결시간)-5, -1):
                 temp5AVG += self.tick_1mindata[code].현재가[i-1] / 5
+            if not code in self.ewm_5.keys():
+                self.ewm_5[code] = []
             if temptime == mintime:
                 if self.ewm_5[code] == []:
                     self.ewm_5[code].append([code, mintime, temp5AVG, mindate])
@@ -474,6 +437,8 @@ class Server_Connector():
             temp10AVG = 0
             for i in range(len(self.tick_1mindata[code].체결시간), len(self.tick_1mindata[code].체결시간)-10, -1):
                 temp10AVG += self.tick_1mindata[code].현재가[i-1] / 10
+            if not code in self.ewm_10.keys():
+                self.ewm_10[code] = []
             if temptime == mintime:
                 if self.ewm_10[code] == []:
                     self.ewm_10[code].append([code, mintime, temp10AVG, mindate])
@@ -489,6 +454,8 @@ class Server_Connector():
             temp30AVG = 0
             for i in range(len(self.tick_1mindata[code].체결시간), len(self.tick_1mindata[code].체결시간)-30, -1):
                 temp30AVG += self.tick_1mindata[code].현재가[i-1] / 30
+            if not code in self.ewm_30.keys():
+                self.ewm_30[code] = []
             if temptime == mintime:
                 if self.ewm_30[code] == []:
                     self.ewm_30[code].append([code, mintime, temp30AVG, mindate])
@@ -500,215 +467,6 @@ class Server_Connector():
                     self.ewm_30[code].append([code, mintime, temp30AVG, mindate])
         if len(alex) >= 3:
             self.ewmQ.put(alex)
-            # EwmQ.put(alex)
-        
-
-    def save_data(self):
-        while True:
-            try:
-                today = datetime.today()
-                if self.queue_Tick.qsize() >= 1000:
-                    data_tick = self.queue_Tick.get()
-                    sql = f"INSERT INTO kiwoom.tick_test \
-                        (code, 총시간, 체결시간, 현재가, 체결방향, 전일대비, 등락율, 최우선매도호가, 최우선매수호가, 거래량, 거래방향,누적거래량, \
-                        누적거래대금, 시가, 고가, 저가, 전일대비기호, 전일거래량대비, 거래대금증감, 전일거래량대비율, \
-                        거래회전율, 거래비용, 체결강도, 시가총액, 장구분, KO접근도, 상한가발생시간, 하한가발생시간, 체결날짜) \
-                        VALUES \
-                        ('{data_tick[0]}', {data_tick[1]}, '{data_tick[2]}', {data_tick[3]}, '{data_tick[4]}', {data_tick[5]}, {data_tick[6]}, {data_tick[7]}, {data_tick[8]}, \
-                         {data_tick[9]}, '{data_tick[10]}', {data_tick[11]}, {data_tick[12]}, {data_tick[13]}, {data_tick[14]}, {data_tick[15]}, {data_tick[16]}, {data_tick[17]}, \
-                         {data_tick[18]}, {data_tick[19]}, {data_tick[20]}, {data_tick[21]}, {data_tick[22]}, {data_tick[23]}, {data_tick[24]}, {data_tick[25]}, {data_tick[26]}, \
-                         {data_tick[27]}, '{data_tick[28]}') \
-                        ON CONFLICT(code, 총시간, 누적거래량) \
-                        DO UPDATE SET (code, 총시간, 체결시간, 현재가, 체결방향, 전일대비, 등락율, 최우선매도호가, 최우선매수호가, 거래량, 거래방향, \
-                        누적거래량, 누적거래대금, 시가, 고가, 저가, 전일대비기호, 전일거래량대비, 거래대금증감, 전일거래량대비율, \
-                        거래회전율, 거래비용, 체결강도, 시가총액, 장구분, KO접근도, 상한가발생시간, 하한가발생시간, 체결날짜) = \
-                        (excluded.code ,excluded.총시간, excluded.체결시간 ,excluded.현재가, excluded.체결방향, excluded.전일대비 ,excluded.등락율 ,excluded.최우선매도호가 \
-                        ,excluded.최우선매수호가 ,excluded.거래량, excluded.거래방향, excluded.누적거래량 ,excluded.누적거래대금 ,excluded.시가 ,excluded.고가 \
-                        ,excluded.저가 ,excluded.전일대비기호 ,excluded.전일거래량대비 ,excluded.거래대금증감 ,excluded.전일거래량대비율 \
-                        ,excluded.거래회전율 ,excluded.거래비용 ,excluded.체결강도 ,excluded.시가총액 ,excluded.장구분 ,excluded.KO접근도 \
-                        ,excluded.상한가발생시간 ,excluded.하한가발생시간, excluded.체결날짜)"
-                    self.con.execute(sql)
-                    self.con.commit()
-                elif today.hour == 15 and today.minute > 31:
-                    data_tick = self.queue_Tick.get()
-                    sql = f"INSERT INTO kiwoom.tick_test \
-                        (code, 총시간, 체결시간, 현재가, 체결방향, 전일대비, 등락율, 최우선매도호가, 최우선매수호가, 거래량, 거래방향,누적거래량, \
-                        누적거래대금, 시가, 고가, 저가, 전일대비기호, 전일거래량대비, 거래대금증감, 전일거래량대비율, \
-                        거래회전율, 거래비용, 체결강도, 시가총액, 장구분, KO접근도, 상한가발생시간, 하한가발생시간, 체결날짜) \
-                        VALUES \
-                        ('{data_tick[0]}', {data_tick[1]}, '{data_tick[2]}', {data_tick[3]}, '{data_tick[4]}', {data_tick[5]}, {data_tick[6]}, {data_tick[7]}, {data_tick[8]}, \
-                         {data_tick[9]}, '{data_tick[10]}', {data_tick[11]}, {data_tick[12]}, {data_tick[13]}, {data_tick[14]}, {data_tick[15]}, {data_tick[16]}, {data_tick[17]}, \
-                         {data_tick[18]}, {data_tick[19]}, {data_tick[20]}, {data_tick[21]}, {data_tick[22]}, {data_tick[23]}, {data_tick[24]}, {data_tick[25]}, {data_tick[26]}, \
-                         {data_tick[27]}, '{data_tick[28]}') \
-                        ON CONFLICT(code, 총시간, 누적거래량) \
-                        DO UPDATE SET (code, 총시간, 체결시간, 현재가, 체결방향, 전일대비, 등락율, 최우선매도호가, 최우선매수호가, 거래량, 거래방향, \
-                        누적거래량, 누적거래대금, 시가, 고가, 저가, 전일대비기호, 전일거래량대비, 거래대금증감, 전일거래량대비율, \
-                        거래회전율, 거래비용, 체결강도, 시가총액, 장구분, KO접근도, 상한가발생시간, 하한가발생시간, 체결날짜) = \
-                        (excluded.code ,excluded.총시간, excluded.체결시간 ,excluded.현재가, excluded.체결방향, excluded.전일대비 ,excluded.등락율 ,excluded.최우선매도호가 \
-                        ,excluded.최우선매수호가 ,excluded.거래량, excluded.거래방향, excluded.누적거래량 ,excluded.누적거래대금 ,excluded.시가 ,excluded.고가 \
-                        ,excluded.저가 ,excluded.전일대비기호 ,excluded.전일거래량대비 ,excluded.거래대금증감 ,excluded.전일거래량대비율 \
-                        ,excluded.거래회전율 ,excluded.거래비용 ,excluded.체결강도 ,excluded.시가총액 ,excluded.장구분 ,excluded.KO접근도 \
-                        ,excluded.상한가발생시간 ,excluded.하한가발생시간, excluded.체결날짜)"
-                    self.con.execute(sql)
-                    self.con.commit()                    
-                if self.queue_1min.qsize() >= 1000:
-                    data_1min = self.queue_1min.get()
-                    sql_1min = f"INSERT INTO kiwoom.tick_1min_test \
-                        (code, 체결시간, 현재가, 거래량, 시가, 고가, 저가, 체결날짜) \
-                        VALUES \
-                        ('{data_1min[0]}', '{data_1min[1]}', {data_1min[2]}, {data_1min[3]}, {data_1min[4]}, \
-                          {data_1min[5]}, {data_1min[6]}, '{data_1min[7]}') \
-                        ON CONFLICT(CODE, 체결시간, 체결날짜) \
-                        DO UPDATE SET (code, 체결시간, 현재가, 거래량, 시가, 고가, 저가, 체결날짜) \
-                        = (excluded.code, excluded.체결시간, excluded.현재가, excluded.거래량, excluded.시가, excluded.고가, excluded.저가, excluded.체결날짜)"
-                    self.con.execute(sql_1min)
-                    self.con.commit()
-                elif today.hour == 15 and today.minute > 31:
-                    data_1min = self.queue_1min.get()
-                    sql_1min = f"INSERT INTO kiwoom.tick_1min_test \
-                        (code, 체결시간, 현재가, 거래량, 시가, 고가, 저가, 체결날짜) \
-                        VALUES \
-                        ('{data_1min[0]}', '{data_1min[1]}', {data_1min[2]}, {data_1min[3]}, {data_1min[4]}, \
-                          {data_1min[5]}, {data_1min[6]}, '{data_1min[7]}') \
-                        ON CONFLICT(CODE, 체결시간, 체결날짜) \
-                        DO UPDATE SET (code, 체결시간, 현재가, 거래량, 시가, 고가, 저가, 체결날짜) \
-                        = (excluded.code, excluded.체결시간, excluded.현재가, excluded.거래량, excluded.시가, excluded.고가, excluded.저가, excluded.체결날짜)"
-                    self.con.execute(sql_1min)
-                    self.con.commit()                    
-                if self.queue_TR.qsize() >= 1000:
-                    data_TR = self.queue_TR.get()
-                    sql_TR = f"INSERT INTO kiwoom.indicator_tr \
-                            (code, 체결시간, tr, 체결날짜) \
-                            VALUES \
-                            ('{data_TR[0]}', '{data_TR[1]}', {data_TR[2]}, '{data_TR[3]}') \
-                            ON CONFLICT(CODE, 체결시간, 체결날짜) \
-                            DO UPDATE SET (code, 체결시간, tr, 체결날짜) \
-                            = (excluded.code, excluded.체결시간, excluded.tr, excluded.체결날짜)"
-                    self.con.execute(sql_TR)
-                    self.con.commit()
-                elif today.hour == 15 and today.minute > 31:
-                    data_TR = self.queue_TR.get()
-                    sql_TR = f"INSERT INTO kiwoom.indicator_tr \
-                            (code, 체결시간, tr, 체결날짜) \
-                            VALUES \
-                            ('{data_TR[0]}', '{data_TR[1]}', {data_TR[2]}, '{data_TR[3]}') \
-                            ON CONFLICT(CODE, 체결시간, 체결날짜) \
-                            DO UPDATE SET (code, 체결시간, tr, 체결날짜) \
-                            = (excluded.code, excluded.체결시간, excluded.tr, excluded.체결날짜)"
-                    self.con.execute(sql_TR)
-                    self.con.commit()                    
-                if self.queue_Current_Line.qsize() >= 1000:
-                    data_CL = self.queue_Current_Line.get()
-                    sql_CL = f"INSERT INTO kiwoom.indicator_cl \
-                            (code, 체결시간, current_line, 체결날짜) \
-                            VALUES \
-                            ('{data_CL[0]}', '{data_CL[1]}', {data_CL[2]}, '{data_CL[3]}') \
-                            ON CONFLICT(CODE, 체결시간, 체결날짜) \
-                            DO UPDATE SET (code, 체결시간, current_line, 체결날짜) \
-                            = (excluded.code, excluded.체결시간, excluded.current_line, excluded.체결날짜)"
-                    self.con.execute(sql_CL)
-                    self.con.commit()
-                elif today.hour == 15 and today.minute > 31:
-                    data_CL = self.queue_Current_Line.get()
-                    sql_CL = f"INSERT INTO kiwoom.indicator_cl \
-                            (code, 체결시간, current_line, 체결날짜) \
-                            VALUES \
-                            ('{data_CL[0]}', '{data_CL[1]}', {data_CL[2]}, '{data_CL[3]}') \
-                            ON CONFLICT(CODE, 체결시간, 체결날짜) \
-                            DO UPDATE SET (code, 체결시간, current_line, 체결날짜) \
-                            = (excluded.code, excluded.체결시간, excluded.current_line, excluded.체결날짜)"
-                    self.con.execute(sql_CL)
-                    self.con.commit()                    
-                if self.queue_ATR.qsize() >= 1000:
-                    data_ATR = self.queue_ATR.get()
-                    sql_ATR = f"INSERT INTO kiwoom.indicator_atr \
-                            (code, 체결시간, atr, 체결날짜) \
-                            VALUES \
-                            ('{data_ATR[0]}', '{data_ATR[1]}', {data_ATR[2]}, '{data_ATR[3]}') \
-                            ON CONFLICT(CODE, 체결시간, 체결날짜) \
-                            DO UPDATE SET (code, 체결시간, atr, 체결날짜) \
-                            = (excluded.code, excluded.체결시간, excluded.atr, excluded.체결날짜)"
-                    self.con.execute(sql_ATR)
-                    self.con.commit()
-                elif today.hour == 15 and today.minute > 31:
-                    data_ATR = self.queue_ATR.get()
-                    sql_ATR = f"INSERT INTO kiwoom.indicator_atr \
-                            (code, 체결시간, atr, 체결날짜) \
-                            VALUES \
-                            ('{data_ATR[0]}', '{data_ATR[1]}', {data_ATR[2]}, '{data_ATR[3]}') \
-                            ON CONFLICT(CODE, 체결시간, 체결날짜) \
-                            DO UPDATE SET (code, 체결시간, atr, 체결날짜) \
-                            = (excluded.code, excluded.체결시간, excluded.atr, excluded.체결날짜)"
-                    self.con.execute(sql_ATR)
-                    self.con.commit()                    
-                if self.queue_ewm_5.qsize() >= 1000:
-                    data_EWM5 = self.queue_ewm_5.get()
-                    sql_EWM5 = f"INSERT INTO kiwoom.indicator_5ewm \
-                            (code, 체결시간, ewm_5, 체결날짜) \
-                            VALUES \
-                            ('{data_EWM5[0]}', '{data_EWM5[1]}', {data_EWM5[2]}, '{data_EWM5[3]}') \
-                            ON CONFLICT(CODE, 체결시간, 체결날짜) \
-                            DO UPDATE SET (code, 체결시간, ewm_5, 체결날짜) \
-                            = (excluded.code, excluded.체결시간, excluded.ewm_5, excluded.체결날짜)"
-                    self.con.execute(sql_EWM5)
-                    self.con.commit()
-                elif today.hour == 15 and today.minute > 31:
-                    data_EWM5 = self.queue_ewm_5.get()
-                    sql_EWM5 = f"INSERT INTO kiwoom.indicator_5ewm \
-                            (code, 체결시간, ewm_5, 체결날짜) \
-                            VALUES \
-                            ('{data_EWM5[0]}', '{data_EWM5[1]}', {data_EWM5[2]}, '{data_EWM5[3]}') \
-                            ON CONFLICT(CODE, 체결시간, 체결날짜) \
-                            DO UPDATE SET (code, 체결시간, ewm_5, 체결날짜) \
-                            = (excluded.code, excluded.체결시간, excluded.ewm_5, excluded.체결날짜)"
-                    self.con.execute(sql_EWM5)
-                    self.con.commit()                    
-                if self.queue_ewm_10.qsize() >= 1000:
-                    data_EWM10 = self.queue_ewm_10.get()
-                    sql_EWM10 = f"INSERT INTO kiwoom.indicator_10ewm \
-                            (code, 체결시간, ewm_10, 체결날짜) \
-                            VALUES \
-                            ('{data_EWM10[0]}', '{data_EWM10[1]}', {data_EWM10[2]}, '{data_EWM10[3]}') \
-                            ON CONFLICT(CODE, 체결시간, 체결날짜) \
-                            DO UPDATE SET (code, 체결시간, ewm_10, 체결날짜) \
-                            = (excluded.code, excluded.체결시간, excluded.ewm_10, excluded.체결날짜)"
-                    self.con.execute(sql_EWM10)
-                    self.con.commit()
-                elif today.hour == 15 and today.minute > 31:
-                    data_EWM10 = self.queue_ewm_10.get()
-                    sql_EWM10 = f"INSERT INTO kiwoom.indicator_10ewm \
-                            (code, 체결시간, ewm_10, 체결날짜) \
-                            VALUES \
-                            ('{data_EWM10[0]}', '{data_EWM10[1]}', {data_EWM10[2]}, '{data_EWM10[3]}') \
-                            ON CONFLICT(CODE, 체결시간, 체결날짜) \
-                            DO UPDATE SET (code, 체결시간, ewm_10, 체결날짜) \
-                            = (excluded.code, excluded.체결시간, excluded.ewm_10, excluded.체결날짜)"
-                    self.con.execute(sql_EWM10)
-                    self.con.commit()                
-                if self.queue_ewm_30.qsize() >= 1000:
-                    data_EWM30 = self.queue_ewm_30.get()
-                    sql_EWM30 = f"INSERT INTO kiwoom.indicator_30ewm \
-                            (code, 체결시간, ewm_30, 체결날짜) \
-                            VALUES \
-                            ('{data_EWM30[0]}', '{data_EWM30[1]}', {data_EWM30[2]}, '{data_EWM30[3]}') \
-                            ON CONFLICT(CODE, 체결시간, 체결날짜) \
-                            DO UPDATE SET (code, 체결시간, ewm_30, 체결날짜) \
-                            = (excluded.code, excluded.체결시간, excluded.ewm_30, excluded.체결날짜)"
-                    self.con.execute(sql_EWM30)
-                    self.con.commit()
-                elif today.hour == 15 and today.minute > 31:
-                    data_EWM30 = self.queue_ewm_30.get()
-                    sql_EWM30 = f"INSERT INTO kiwoom.indicator_30ewm \
-                            (code, 체결시간, ewm_30, 체결날짜) \
-                            VALUES \
-                            ('{data_EWM30[0]}', '{data_EWM30[1]}', {data_EWM30[2]}, '{data_EWM30[3]}') \
-                            ON CONFLICT(CODE, 체결시간, 체결날짜) \
-                            DO UPDATE SET (code, 체결시간, ewm_30, 체결날짜) \
-                            = (excluded.code, excluded.체결시간, excluded.ewm_30, excluded.체결날짜)"
-                    self.con.execute(sql_EWM30)
-                    self.con.commit()                    
-            except Exception as e :
-                print(e)
                 
     def removeClient(self, addr, client):
         idx = -1
@@ -972,18 +730,27 @@ class Server_Connector():
     ##########################################################################
 
 if __name__ == '__main__':
-    # os.system('pause')
     manager = Manager()
-    BuyQ, SellQ, StockQ, EwmQ = \
-        Queue(), Queue(), Queue(), Queue()
-    tick_1mindata = manager.dict()
+    BuyQ, SellQ, StockQ, EwmQ, queue_Tick, queue_1min, queue_ATR, queue_ewm_5, queue_ewm_10, queue_ewm_30 = \
+    Queue(), Queue(), Queue(), Queue(), Queue(), Queue(), Queue(), Queue(), Queue(), Queue()
 
-    wc = Process(target=Server_Connector, args=(BuyQ, SellQ, StockQ, EwmQ, tick_1mindata))
-    trading_bot_proc = Process(target=Three_dimesion, args=(tick_1mindata, BuyQ, SellQ, StockQ, EwmQ), daemon=True)
+    # tick_1mindata = manager.dict()
+
+    #메인 프로세스
+    wc = Process(target=Server_Connector, args=(BuyQ, SellQ, StockQ, EwmQ,  \
+        queue_Tick, queue_1min, queue_ATR, queue_ewm_5, queue_ewm_10, queue_ewm_30))
+    #DB 프로세스
+    update_data = Process(target=Update_Data, name='DB_Updater',args=(queue_Tick, queue_1min, queue_ATR, \
+        queue_ewm_5, queue_ewm_10, queue_ewm_30, BuyQ), daemon=True)
+    
+    #로봇 프로세스
+    trading_bot_proc = Process(target=Three_dimension, name='Three_dimension',args=(BuyQ, SellQ, StockQ, EwmQ), daemon=True)
 
     wc.start()
+    update_data.start()
     trading_bot_proc.start()
     wc.join()
+    update_data.join()
     trading_bot_proc.join()
 
 

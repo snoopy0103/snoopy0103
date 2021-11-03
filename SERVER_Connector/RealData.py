@@ -1,14 +1,14 @@
 class RealData:
-    def __init__(self, code: str, name: str, market: str):
+    def __init__(self, code: str):#, name: str, market: str):
         # 종목코드, 종목명, 시장타입 설정
         self.code   = code
-        self.name   = name
-        if market == '': # ETN은 공백이 넘어옴
-            self.market = 'ETN'
-        else:
-            self.market = market
+        # self.name   = name
+        # if market == '': # ETN은 공백이 넘어옴
+        #     self.market = 'ETN'
+        # else:
+        #     self.market = market
         
-        self.tick_count = 0
+        # self.tick_count = 0
         
         # '주식체결' 데이터 저장용
         self.총시간           = []

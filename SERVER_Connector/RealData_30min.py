@@ -1,5 +1,5 @@
 
-class RealData_1min():
+class RealData_30min():
     def __init__(self, code: str):#, name: str, market: str):
         # 종목코드, 종목명, 시장타입 설정
         self.code   = code
@@ -18,13 +18,9 @@ class RealData_1min():
         self.시가             = []
         self.고가             = []
         self.저가             = []
-        self.누적거래량       = []
-        self.전체누적거래량       = []
-        self.전체누적거래대금     = []
-        self.체결강도        = []
         self.체결날짜        = []
 
-    def append(self, 체결시간: str, 현재가: str, 거래량: str, 시가: str, 고가: str, 저가: str, 누적거래량: str, 전체누적거래량: str, 전체누적거래대금: str, 체결강도: str, 체결날짜: str) -> None:
+    def append(self, 체결시간: str, 현재가: str, 거래량: str, 시가: str, 고가: str, 저가: str, 체결날짜: str) -> None:
         '''
         실시간 데이터를 추가하는 함수
         '''
@@ -34,10 +30,6 @@ class RealData_1min():
         self.시가+=[시가]
         self.고가+=[고가]
         self.저가+=[저가]
-        self.누적거래량+=[누적거래량]
-        self.전체누적거래량+=[전체누적거래량]
-        self.전체누적거래대금+=[전체누적거래대금]
-        self.체결강도+=[체결강도]
         self.체결날짜+=[체결날짜]
         
         # self.체결시간.append(체결시간)
@@ -60,11 +52,7 @@ class RealData_1min():
         시가 = self.시가[-1]
         고가 = self.고가[-1]
         저가 = self.저가[-1]
-        누적거래량 = self.누적거래량[-1]
-        전체누적거래량 = self.전체누적거래량[-1]
-        전체누적거래대금 = self.전체누적거래대금[-1]
-        체결강도 = self.체결강도[-1]
         체결날짜 =self.체결날짜[-1]
-        temp_list = [체결시간, 현재가, 거래량, 시가, 고가, 저가, 누적거래량, 전체누적거래량, 전체누적거래대금, 체결강도, 체결날짜]
+        temp_list = [체결시간, 현재가, 거래량, 시가, 고가, 저가, 체결날짜]
         return temp_list
         

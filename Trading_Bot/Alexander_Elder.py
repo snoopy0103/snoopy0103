@@ -31,35 +31,35 @@ class Three_dimension():
     def start(self):
         while True:
             pass
-            # if self.ewmQ.qsize() > 0:
-            #     tempQ = self.ewmQ.get()
-            #     self.Code = tempQ[0][0]
-            #     mintime = self.tick_1mindata[self.Code].체결시간[-1]
-            #     self.Price = self.tick_1mindata[self.Code].현재가[-1]
-            #     self.temptime = tempQ[0][1]
-            #     self.tempdate = tempQ[0][3]
-            #     self.ewm_5Q = tempQ[0][2]
-            #     self.ewm_10Q = tempQ[1][2]
-            #     self.ewm_30Q = tempQ[2][2]            
+            if self.ewmQ.qsize() > 0:
+                tempQ = self.ewmQ.get()
+                self.Code = tempQ[0][0]
+                mintime = self.tick_1mindata[self.Code].체결시간[-1]
+                self.Price = self.tick_1mindata[self.Code].현재가[-1]
+                self.temptime = tempQ[0][1]
+                self.tempdate = tempQ[0][3]
+                self.ewm_5Q = tempQ[0][2]
+                self.ewm_10Q = tempQ[1][2]
+                self.ewm_30Q = tempQ[2][2]            
 
-            #     #ewm5
-            #     if not self.Code in self.ewm_5.keys():
-            #         self.ewm_5[self.Code] = []
-            #         self.ewm_5[self.Code].append([self.Code, self.temptime, self.ewm_5Q, self.tempdate])
-            #     else:
-            #         self.ewm_5[self.Code].append([self.Code, self.temptime, self.ewm_5Q, self.tempdate])
-            #     #ewm10
-            #     if not self.Code in self.ewm_10.keys():
-            #         self.ewm_10[self.Code] = []
-            #         self.ewm_10[self.Code].append([self.Code, self.temptime, self.ewm_10Q, self.tempdate])
-            #     else:
-            #         self.ewm_10[self.Code].append([self.Code, self.temptime, self.ewm_10Q, self.tempdate])
-            #     #ewm30
-            #     if not self.Code in self.ewm_30.keys():
-            #         self.ewm_30[self.Code] = []
-            #         self.ewm_30[self.Code].append([self.Code, self.temptime, self.ewm_30Q, self.tempdate])
-            #     else:
-            #         self.ewm_30[self.Code].append([self.Code, self.temptime, self.ewm_30Q, self.tempdate])
+                #ewm5
+                if not self.Code in self.ewm_5.keys():
+                    self.ewm_5[self.Code] = []
+                    self.ewm_5[self.Code].append([self.Code, self.temptime, self.ewm_5Q, self.tempdate])
+                else:
+                    self.ewm_5[self.Code].append([self.Code, self.temptime, self.ewm_5Q, self.tempdate])
+                #ewm10
+                if not self.Code in self.ewm_10.keys():
+                    self.ewm_10[self.Code] = []
+                    self.ewm_10[self.Code].append([self.Code, self.temptime, self.ewm_10Q, self.tempdate])
+                else:
+                    self.ewm_10[self.Code].append([self.Code, self.temptime, self.ewm_10Q, self.tempdate])
+                #ewm30
+                if not self.Code in self.ewm_30.keys():
+                    self.ewm_30[self.Code] = []
+                    self.ewm_30[self.Code].append([self.Code, self.temptime, self.ewm_30Q, self.tempdate])
+                else:
+                    self.ewm_30[self.Code].append([self.Code, self.temptime, self.ewm_30Q, self.tempdate])
 
             #     #macd
             #     macd = self.ewm_10[self.Code][-1][2] - self.ewm_30[self.Code][-1][2]
